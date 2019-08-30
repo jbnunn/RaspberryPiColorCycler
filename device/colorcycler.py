@@ -14,8 +14,15 @@ from agt import AlexaGadget
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ALEXA_BLUE = (49, 196, 243)
-WHITE = (255, 255, 255)
+COLORS = {
+    "ALEXA BLUE": (49, 196, 243),
+    "AMAZON ORANGE": (255, 153, 0),
+    "RED": (255, 0, 0),
+    "WHOLE FOODS GREEN": (0, 103, 75),
+    "CYAN": (0, 255, 255),
+    "TWITCH PURPLE": (100, 65, 165),
+    "YELLOW": (255, 255, 0)
+}
 
 sense = SenseHat()
 sense.set_rotation(180)
@@ -52,12 +59,9 @@ class ColorCyclerGadget(AlexaGadget):
         for state in directive.payload.states:
             if state.name == 'wakeword':
                 if state.value == 'active':
-                    logger.info('Wake word active - show countdown on matrix')
-                    sense.show_message("Ready?", text_colour=ALEXA_BLUE)
-                    sense.show_message("3!", text_colour=ALEXA_BLUE)
-                    sense.show_message("2!", text_colour=ALEXA_BLUE)
-                    sense.show_message("1!", text_colour=ALEXA_BLUE)
-                    sense.show_message("GO!", text_colour=ALEXA_BLUE)
+                    logger.info('Wake word active')
+                    sense.clear(COLORS['ALEXA BLUE'])
+                    time.sleep(2)
                 elif state.value == 'cleared':
                     logger.info('Wake word cleared - clear matrix')
                     sense.clear()
@@ -72,6 +76,7 @@ class ColorCyclerGadget(AlexaGadget):
         logger.info('BlinkLED directive received: LED will cycle through ' + str(payload['colors_list']) + ' colors')
 
         self.lock.acquire()
+
         # Initialize the color animation states based on parameters received from skill
         self.colors_list = payload['colors_list']
         self.interval_ms = payload['intervalMs']
@@ -117,6 +122,10 @@ class ColorCyclerGadget(AlexaGadget):
         Plays the LED cycling animation based on the color animation states
         """
         while True:
+            for event in sense.stick.get_events():
+                if event.direction == "middle" and event.action == "pressed":
+                    self._button_pressed()
+
             # If cycling animation is still active
             if self.keep_cycling and self.cycle_count < len(self.colors_list) * self.iterations:
                 self.lock.acquire()
@@ -126,7 +135,7 @@ class ColorCyclerGadget(AlexaGadget):
                 self.lock.release()
 
                 # Set the color for the LED
-                #RGB_LED.color = Color(self.color.lower())
+                sense.clear(COLORS[self.color])
 
                 # Display the color for specified interval before switching again
                 time.sleep(self.interval_ms/1000)
@@ -134,12 +143,12 @@ class ColorCyclerGadget(AlexaGadget):
             # If button is pressed, display the current color for 5 seconds
             elif not self.keep_cycling and self.game_active:
                 time.sleep(5)
-                #RGB_LED.off()
+                sense.clear()
                 self.lock.acquire()
                 self.game_active = False
                 self.lock.release()
             else:
-                #RGB_LED.off()
+                sense.clear()
                 time.sleep(0.1)
 
 if __name__ == '__main__':
@@ -147,4 +156,3 @@ if __name__ == '__main__':
         ColorCyclerGadget().main()
     finally:
         sense.clear()
-        # BUTTON.close()
